@@ -1,0 +1,16 @@
+.chat-item-answer.none:empty::after,
+.chat-item-answer.generating:not(:empty)::after {
+  content: "\2026";
+}
+
+.chat-item-answer.generated:empty::after {
+  content: "Sorry, I don't have an answer for that...";
+}
+
+.chat-item-answer.error:empty::after {
+  content: "⚠️ Whoops, something went wrong...";
+}
+
+.chat-item-answer.error:not(:empty)::after {
+  content: "\A⚠️ Whoops, something went wrong...";
+}

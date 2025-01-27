@@ -1,0 +1,17 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page vw-100 vh-100 overflow-auto">
+    <ErrorBoundary>
+        <ChildContent>
+            @Body
+        </ChildContent>
+        <ErrorContent>
+            <div class="p-4">
+                <div class="lead">
+                    ⚠️ An unhandled error has occurred.
+                    <a href="./" class="reload">Reload</a>
+                </div>
+            </div>
+        </ErrorContent>
+    </ErrorBoundary>
+</div>

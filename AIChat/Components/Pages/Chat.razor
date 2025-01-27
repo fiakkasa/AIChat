@@ -1,0 +1,181 @@
+﻿@page "/"
+@inject IChatItemInteractionService _chatItemInteractionService
+@inject ILogger<Chat> _logger
+@inject IOptionsMonitor<AiChatConfig> _configurationMonitor
+@inject IJSRuntime _jsRuntime
+@implements IDisposable
+
+<PageTitle>Chat</PageTitle>
+
+<div id="chat-top" @ref="_chatTopRef"></div>
+<div class="container p-4">
+    <div class="row position-sticky top-0 z-1 bg-body p-1">
+        <div class="col-12 col-md-10 col-lg-8 mx-auto">
+            <h1>Chat with the AI Chatbot</h1>
+            <p class="small text-muted">Type a question and click the "Send" button to chat with the AI Chatbot.</p>
+        </div>
+    </div>
+
+    @foreach (var item in _responses)
+    {
+        <div class="row mb-1">
+            <div class="col-12 col-md-10 col-lg-8 mx-auto">
+                <div class="card p-1">
+                    <div class="card-title p-1 d-flex align-items-center">
+                        <h4 class="flex-fill text-wrap m-0">
+                            @item.Question
+                        </h4>
+                        <div
+                            class="d-flex flex-column align-items-end flex-shrink-0 small text-secondary text-nowrap ms-1">
+                            <div>
+                                @item.Timestamp.ToString(_timestampFormat)
+                            </div>
+                            <div>
+                                @item.Model
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="m-0"/>
+                    <div class="card-body p-1">
+                        <div
+                            class="chat-item-answer @Enum.GetName(item.Status)?.ToLower() @(item.IsMultiline ? "text-new-lines" : "text-wrap")">
+                            @item.Answer
+                        </div>
+
+                        @if (item.Status == ChatItemStatusType.Generating)
+                        {
+                            <div class="placeholder-glow mt-2">
+                                <span class="placeholder col-7"></span>
+                                <span class="placeholder col-4"></span>
+                                <span class="placeholder col-4"></span>
+                                <span class="placeholder col-6"></span>
+                                <span class="placeholder col-8"></span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row position-sticky bottom-0 z-2 bg-body p-1">
+        <div class="col-12 col-md-10 col-lg-8 mx-auto">
+            <div class="input-group mb-3">
+                <input class="form-control mb-2"
+                       placeholder="Type your question here..."
+                       disabled="@Loading"
+                       @bind="_userInput"
+                       @onkeyup="OnEnter"/>
+                <div class="input-group-append">
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            disabled="@Loading"
+                            @onclick="Send">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ElementReference _chatTopRef;
+    private string _userInput = string.Empty;
+    private readonly List<ChatItem> _responses = [];
+    private readonly CancellationTokenSource _cts = new();
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private const string _timestampFormat = "HH:mm:ss tt";
+
+    private bool Loading => _responses is [{ Status: ChatItemStatusType.Generating }, ..];
+
+    private async Task OnEnter(KeyboardEventArgs eventArgs)
+    {
+        if (eventArgs.Key != "Enter")
+        {
+            return;
+        }
+
+        await Send();
+    }
+
+    private async Task Send()
+    {
+        if (Loading || _userInput is not { Length: > 0 })
+        {
+            return;
+        }
+
+        var model = string.Empty;
+        var timestamp = DateTimeOffset.Now;
+
+        try
+        {
+            await _semaphore.WaitAsync(_cts.Token);
+
+            var config = _configurationMonitor.CurrentValue!;
+            model = config.Model;
+
+            await _jsRuntime.InvokeVoidAsync("window.scrollElementToView", _cts.Token, _chatTopRef);
+
+            var chatItem = new ChatItem
+            {
+                Question = _userInput,
+                Model = model,
+                Timestamp = timestamp,
+                Status = ChatItemStatusType.Generating
+            };
+            _responses.Insert(0, chatItem);
+
+            StateHasChanged();
+
+            if (config.Stream)
+            {
+                await _chatItemInteractionService.HandleStreamingRequest(chatItem, config, StateHasChanged, _cts.Token);
+            }
+            else
+            {
+                await _chatItemInteractionService.HandlePlainRequest(chatItem, config, cancellationToken: _cts.Token);
+            }
+
+            chatItem.Status = ChatItemStatusType.Generated;
+            _userInput = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending message '{Message}' to chatbot", _userInput);
+
+            FailedAttemptHandler(model, _userInput, timestamp);
+        }
+
+        _semaphore.Release();
+
+        StateHasChanged();
+    }
+
+    private void FailedAttemptHandler(string model, string question, DateTimeOffset timestamp)
+    {
+        var failedChat = new ChatItem
+        {
+            Question = question,
+            Model = model,
+            Timestamp = timestamp,
+            Status = ChatItemStatusType.Error
+        };
+
+        if (_responses is [{ Status: ChatItemStatusType.Generating }, ..])
+        {
+            _responses[0] = failedChat;
+            return;
+        }
+
+        _responses.Insert(0, failedChat);
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _semaphore.Dispose();
+    }
+
+}
