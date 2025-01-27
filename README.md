@@ -5,6 +5,10 @@
 - [AI Chatbot](#ai-chatbot)
     - [Table of Contents](#table-of-contents)
     - [Overview](#overview)
+    - [Setup](#setup)
+        - [LLM Studio](#llm-studio)
+        - [AIChat App](#aichat-app)
+    - [Tips](#tips)
 
 ## Overview
 
@@ -31,21 +35,17 @@ Blazor Server with C#!
   ex.
   ```json
   {
-     "AiChatConfig": {
-       "BaseUri": "http://localhost:7788",
-       "ChatCompletionsUrlFragment": "v1/chat/completions",
-       "Model": "phi-4",
-       "Role": "user",
-       "MaxTokens": 4096,
-       "Stream": false,
-       "WaitAndRetryIntervals": [
-         "00:00:02",
-         "00:00:04",
-         "00:00:08"
-       ]
-     }
-   }
-   ```
+    "AiChatConfig": {
+      "BaseUri": "http://localhost:7788",
+      "ChatCompletionsUrlFragment": "v1/chat/completions",
+      "Model": "phi-4",
+      "Role": "user",
+      "MaxTokens": 4096,
+      "Stream": false,
+      "WaitAndRetryIntervals": ["00:00:02", "00:00:04", "00:00:08"]
+    }
+  }
+  ```
 - Run the project: `dotnet run --project AIChat/AIChat.csproj`!
 
 ## Tips
