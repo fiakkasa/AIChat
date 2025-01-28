@@ -2,7 +2,7 @@ namespace AIChat.Services;
 
 public sealed partial class ChatItemInteractionService(
     IHttpClientFactory httpClientFactory
-) : IChatItemInteractionService
+) : IChatItemInteractionService, IDisposable
 {
     private const int _streamingInitialDelay = 375;
     private const int _streamingUpdateDelay = 125;
@@ -14,7 +14,10 @@ public sealed partial class ChatItemInteractionService(
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly HttpClient? _httpClient = httpClientFactory.CreateClient(Consts.AiChatClientName);
+    private HttpClient? _client;
+
+    private HttpClient Client =>
+        _client ??= httpClientFactory.CreateClient(Consts.AiChatClientName);
 
     public async ValueTask HandleStreamingRequest(
         ChatItem chatItem,
@@ -110,13 +113,15 @@ public sealed partial class ChatItemInteractionService(
         progressNotifier?.Invoke();
     }
 
+    public void Dispose() => _client?.Dispose();
+
     private async ValueTask<HttpResponseMessage> SendHttpRequest(
         AiChatConfig config,
         string question,
         CancellationToken cancellationToken
     )
     {
-        var response = await _httpClient!.PostAsJsonAsync(
+        var response = await Client!.PostAsJsonAsync(
             config.ChatCompletionsUrlFragment,
             new ChatRequest(
                 [new(Content: question, Role: config.Role)],
@@ -132,7 +137,9 @@ public sealed partial class ChatItemInteractionService(
         return response;
     }
 
-    private static async ValueTask NotifyProgress(Action? progressNotifier, int delay,
+    private static async ValueTask NotifyProgress(
+        Action? progressNotifier,
+        int delay,
         CancellationToken cancellationToken)
     {
         if (progressNotifier is null)
