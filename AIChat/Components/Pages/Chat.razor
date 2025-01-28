@@ -1,79 +1,78 @@
 ﻿@page "/"
-@inject IChatItemInteractionService _chatItemInteractionService
-@inject ILogger<Chat> _logger
-@inject IOptionsMonitor<AiChatConfig> _configurationMonitor
-@inject IJSRuntime _jsRuntime
+@inject IChatItemInteractionService ChatItemInteractionService
+@inject ILogger<Chat> Logger
+@inject IOptionsMonitor<AiChatConfig> ConfigurationMonitor
+@inject IJSRuntime JsRuntime
 @implements IDisposable
 
 <PageTitle>Chat</PageTitle>
 
 <div id="chat-top" @ref="_chatTopRef"></div>
-<div class="container p-4">
-    <div class="row position-sticky top-0 z-1 bg-body p-1">
-        <div class="col-12 col-md-10 col-lg-8 mx-auto">
-            <h1>Chat with the AI Chatbot</h1>
-            <p class="small text-muted">Type a question and click the "Send" button to chat with the AI Chatbot.</p>
-        </div>
+
+<div class="row position-sticky top-0 z-1 bg-body p-1">
+    <div class="col-12 col-md-10 col-lg-8 mx-auto">
+        <h1>Chat with the AI Chatbot</h1>
+        <p class="small text-muted">Type a question and click the "Send" button to chat with the AI Chatbot.</p>
     </div>
+</div>
 
-    @foreach (var item in _responses)
-    {
-        <div class="row mb-1">
-            <div class="col-12 col-md-10 col-lg-8 mx-auto">
-                <div class="card p-1">
-                    <div class="card-title p-1 d-flex align-items-center">
-                        <h4 class="flex-fill text-wrap m-0">
-                            @item.Question
-                        </h4>
-                        <div
-                            class="d-flex flex-column align-items-end flex-shrink-0 small text-secondary text-nowrap ms-1">
-                            <div>
-                                @item.Timestamp.ToString(_timestampFormat)
-                            </div>
-                            <div>
-                                @item.Model
-                            </div>
+@foreach (var item in _responses)
+{
+    <div class="row mb-1">
+        <div class="col-12 col-md-10 col-lg-8 mx-auto">
+            <div class="card p-1">
+                <div class="card-title p-1 d-flex align-items-center">
+                    <h4 class="flex-fill text-wrap m-0">
+                        @item.Question
+                    </h4>
+                    <div
+                        class="d-flex flex-column align-items-end flex-shrink-0 small text-secondary text-nowrap ms-1">
+                        <div>
+                            @item.Timestamp.ToString(_timestampFormat)
+                        </div>
+                        <div>
+                            @item.Model
                         </div>
                     </div>
-                    <hr class="m-0"/>
-                    <div class="card-body p-1">
-                        <div
-                            class="chat-item-answer @Enum.GetName(item.Status)?.ToLower() @(item.IsMultiline ? "text-new-lines" : "text-wrap")">
-                            @item.Answer
-                        </div>
-
-                        @if (item.Status == ChatItemStatusType.Generating)
-                        {
-                            <div class="placeholder-glow mt-2">
-                                <span class="placeholder col-7"></span>
-                                <span class="placeholder col-4"></span>
-                                <span class="placeholder col-4"></span>
-                                <span class="placeholder col-6"></span>
-                                <span class="placeholder col-8"></span>
-                            </div>
-                        }
+                </div>
+                <hr class="m-0"/>
+                <div class="card-body p-1">
+                    <div
+                        class="chat-item-answer @Enum.GetName(item.Status)?.ToLower() @(item.IsMultiline ? "text-new-lines" : "text-wrap")">
+                        @item.Answer
                     </div>
+
+                    @if (item.Status == ChatItemStatusType.Generating)
+                    {
+                        <div class="placeholder-glow mt-2">
+                            <span class="placeholder col-7"></span>
+                            <span class="placeholder col-4"></span>
+                            <span class="placeholder col-4"></span>
+                            <span class="placeholder col-6"></span>
+                            <span class="placeholder col-8"></span>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
-    }
+    </div>
+}
 
-    <div class="row position-sticky bottom-0 z-2 bg-body p-1">
-        <div class="col-12 col-md-10 col-lg-8 mx-auto">
-            <div class="input-group mb-3">
-                <input class="form-control mb-2"
-                       placeholder="Type your question here..."
-                       disabled="@Loading"
-                       @bind="_userInput"
-                       @onkeyup="OnEnter"/>
-                <div class="input-group-append">
-                    <button type="button"
-                            class="btn btn-outline-primary"
-                            disabled="@Loading"
-                            @onclick="Send">
-                        Send
-                    </button>
-                </div>
+<div class="row position-sticky bottom-0 z-2 bg-body p-1">
+    <div class="col-12 col-md-10 col-lg-8 mx-auto">
+        <div class="input-group mb-3">
+            <input class="form-control mb-2"
+                   placeholder="Type your question here..."
+                   disabled="@Loading"
+                   @bind="_userInput"
+                   @onkeyup="OnEnter"/>
+            <div class="input-group-append">
+                <button type="button"
+                        class="btn btn-outline-primary"
+                        disabled="@Loading"
+                        @onclick="Send">
+                    Send
+                </button>
             </div>
         </div>
     </div>
@@ -113,10 +112,10 @@
         {
             await _semaphore.WaitAsync(_cts.Token);
 
-            var config = _configurationMonitor.CurrentValue!;
+            var config = ConfigurationMonitor.CurrentValue!;
             model = config.Model;
 
-            await _jsRuntime.InvokeVoidAsync("window.scrollElementToView", _cts.Token, _chatTopRef);
+            await JsRuntime.InvokeVoidAsync("window.scrollElementToView", _cts.Token, _chatTopRef);
 
             var chatItem = new ChatItem
             {
@@ -131,11 +130,11 @@
 
             if (config.Stream)
             {
-                await _chatItemInteractionService.HandleStreamingRequest(chatItem, config, StateHasChanged, _cts.Token);
+                await ChatItemInteractionService.HandleStreamingRequest(chatItem, config, StateHasChanged, _cts.Token);
             }
             else
             {
-                await _chatItemInteractionService.HandlePlainRequest(chatItem, config, cancellationToken: _cts.Token);
+                await ChatItemInteractionService.HandlePlainRequest(chatItem, config, cancellationToken: _cts.Token);
             }
 
             chatItem.Status = ChatItemStatusType.Generated;
@@ -143,7 +142,7 @@
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending message '{Message}' to chatbot", _userInput);
+            Logger.LogError(ex, "Error sending message '{Message}' to chatbot", _userInput);
 
             FailedAttemptHandler(model, _userInput, timestamp);
         }

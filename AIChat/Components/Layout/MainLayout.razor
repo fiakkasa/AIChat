@@ -1,17 +1,26 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
 
 <div class="page vw-100 vh-100 overflow-auto">
-    <ErrorBoundary>
+    <ErrorBoundary @ref="_errorBoundary">
         <ChildContent>
-            @Body
+            <div class="container p-4">
+                @Body
+            </div>
         </ChildContent>
         <ErrorContent>
-            <div class="p-4">
-                <div class="lead">
+            <div class="container p-4">
+                <div class="lead mb-2">
                     ⚠️ An unhandled error has occurred.
-                    <a href="./" class="reload">Reload</a>
                 </div>
+                <a href="@NavigationManager.Uri" class="btn btn-outline-primary">Reload</a>
             </div>
         </ErrorContent>
     </ErrorBoundary>
 </div>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+
+    protected override void OnParametersSet() => _errorBoundary?.Recover();
+}
