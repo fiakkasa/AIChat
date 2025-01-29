@@ -1,6 +1,6 @@
-function scrollElementToView(element) {
+function scrollElementToView(element, behavior = null) {
     try {
-        element.scrollIntoView({behavior: "smooth"});
+        element.scrollIntoView({behavior: behavior ?? 'smooth'});
     } catch (error) {
         console.log(error);
     }

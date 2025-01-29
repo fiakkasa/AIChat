@@ -2,17 +2,15 @@ namespace AIChat.Interfaces;
 
 public interface IChatItemInteractionService
 {
-    public ValueTask HandleStreamingRequest(
-        ChatItem chatItem,
+    public IAsyncEnumerable<string> HandleStreamingRequest(
+        string question,
         AiChatConfig config,
-        Action? progressNotifier = default,
         CancellationToken cancellationToken = default
     );
 
-    public ValueTask HandlePlainRequest(
-        ChatItem chatItem,
+    public IAsyncEnumerable<string> HandlePlainRequest(
+        string question,
         AiChatConfig config,
-        Action? progressNotifier = default,
         CancellationToken cancellationToken = default
     );
 }
