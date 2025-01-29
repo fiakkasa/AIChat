@@ -7,7 +7,7 @@
 
 <PageTitle>Chat</PageTitle>
 
-<div id="chat-top" @ref="_chatTopRef"></div>
+<div @ref="_chatTopRef"></div>
 
 <div class="row position-sticky top-0 z-1 bg-body p-1">
     <div class="col-12 col-md-10 col-lg-8 mx-auto">
@@ -22,7 +22,7 @@
         <div class="col-12 col-md-10 col-lg-8 mx-auto">
             <div class="card p-1">
                 <div class="card-title p-1 d-flex align-items-center">
-                    <h4 class="flex-fill text-wrap m-0">
+                    <h4 class="flex-fill text-wrap overflow-hidden m-0">
                         @item.Question
                     </h4>
                     <div
@@ -38,7 +38,7 @@
                 <hr class="m-0"/>
                 <div class="card-body p-1">
                     <div
-                        class="chat-item-answer @Enum.GetName(item.Status)?.ToLower() @(item.IsMultiline ? "text-new-lines" : "text-wrap")">
+                        class="chat-item-answer @Enum.GetName(item.Status)?.ToLower() @(item.IsMultiline ? "text-new-lines" : "text-wrap") overflow-auto">
                         @item.Answer
                     </div>
 
@@ -85,6 +85,9 @@
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private const string _timestampFormat = "HH:mm:ss tt";
+    private const int _streamingUpdateDelay = 125;
+    private const int _streamingCyclesCommitCount = 10;
+    private static readonly Regex _newLineRegex = new("\\n", RegexOptions.Compiled);
 
     private bool Loading => _responses is [{ Status: ChatItemStatusType.Generating }, ..];
 
@@ -128,14 +131,7 @@
 
             StateHasChanged();
 
-            if (config.Stream)
-            {
-                await ChatItemInteractionService.HandleStreamingRequest(chatItem, config, StateHasChanged, _cts.Token);
-            }
-            else
-            {
-                await ChatItemInteractionService.HandlePlainRequest(chatItem, config, cancellationToken: _cts.Token);
-            }
+            await ResponseHandler(chatItem, config, _cts.Token);
 
             chatItem.Status = ChatItemStatusType.Generated;
             _userInput = string.Empty;
@@ -150,6 +146,37 @@
         _semaphore.Release();
 
         StateHasChanged();
+    }
+
+    private async ValueTask ResponseHandler(ChatItem chatItem, AiChatConfig config, CancellationToken cancellationToken)
+    {
+        var builder = new StringBuilder();
+        var iterations = 0L;
+        var answersFragmentStream = config.Stream switch
+        {
+            true => ChatItemInteractionService.HandleStreamingRequest(chatItem.Question, config, cancellationToken),
+            _ => ChatItemInteractionService.HandlePlainRequest(chatItem.Question, config, cancellationToken)
+        };
+
+        await foreach (var answerFragment in answersFragmentStream.WithCancellation(cancellationToken))
+        {
+            builder.Append(answerFragment);
+
+            if (!(config.Stream && ++iterations % _streamingCyclesCommitCount == 0))
+            {
+                continue;
+            }
+
+            chatItem.Answer = builder.ToString();
+            chatItem.IsMultiline = _newLineRegex.IsMatch(chatItem.Answer);
+
+            await Task.Delay(_streamingUpdateDelay, cancellationToken);
+
+            StateHasChanged();
+        }
+
+        chatItem.Answer = builder.ToString();
+        chatItem.IsMultiline = _newLineRegex.IsMatch(chatItem.Answer);
     }
 
     private void FailedAttemptHandler(string model, string question, DateTimeOffset timestamp)
